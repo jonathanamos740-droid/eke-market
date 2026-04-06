@@ -6,6 +6,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || 'CG-ww38dvoPhso7kYTyXbLrMQ8h';
 
 // ── CORS CONFIGURATION ──
 app.use(cors({
@@ -73,7 +74,8 @@ app.get('/api/coins', async (req, res) => {
   try {
     const { data } = await fetchWithFallback('coins', async () => {
       const response = await fetch(
-        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true&price_change_percentage=1h,24h,7d'
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true&price_change_percentage=1h,24h,7d',
+        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
       );
       if (!response.ok) throw new Error('CoinGecko failed');
       return response.json();
@@ -90,7 +92,8 @@ app.get('/api/coins/:id', async (req, res) => {
   try {
     const { data } = await fetchWithFallback(`coin_${id}`, async () => {
       const response = await fetch(
-        `https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false`
+        `https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false`,
+        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
       );
       if (!response.ok) throw new Error('CoinGecko failed');
       return response.json();
@@ -108,7 +111,8 @@ app.get('/api/coins/:id/chart', async (req, res) => {
   try {
     const { data } = await fetchWithFallback(`chart_${id}_${days}`, async () => {
       const response = await fetch(
-        `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`
+        `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`,
+        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
       );
       if (!response.ok) throw new Error('CoinGecko failed');
       return response.json();
@@ -137,7 +141,9 @@ app.get('/api/global', async (req, res) => {
 app.get('/api/trending', async (req, res) => {
   try {
     const { data } = await fetchWithFallback('trending', async () => {
-      const response = await fetch('https://api.coingecko.com/api/v3/search/trending');
+      const response = await fetch('https://api.coingecko.com/api/v3/search/trending', {
+        headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY }
+      });
       if (!response.ok) throw new Error('CoinGecko failed');
       return response.json();
     });
@@ -196,7 +202,8 @@ app.get('/api/search', async (req, res) => {
   try {
     const { data } = await fetchWithFallback(`search_${query}`, async () => {
       const response = await fetch(
-        `https://api.coingecko.com/api/v3/search?query=${query}`
+        `https://api.coingecko.com/api/v3/search?query=${query}`,
+        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
       );
       if (!response.ok) throw new Error('Search failed');
       return response.json();
@@ -212,7 +219,8 @@ app.get('/api/gainers-losers', async (req, res) => {
   try {
     const { data } = await fetchWithFallback('gainers_losers', async () => {
       const response = await fetch(
-        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&price_change_percentage=24h'
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&price_change_percentage=24h',
+        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
       );
       if (!response.ok) throw new Error('Gainers losers failed');
       return response.json();
@@ -239,7 +247,8 @@ app.get('/api/compare', async (req, res) => {
   try {
     const { data } = await fetchWithFallback(`compare_${ids}`, async () => {
       const response = await fetch(
-        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=10&page=1&sparkline=true&price_change_percentage=1h,24h,7d`
+        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=10&page=1&sparkline=true&price_change_percentage=1h,24h,7d`,
+        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
       );
       if (!response.ok) throw new Error('Comparison failed');
       return response.json();
