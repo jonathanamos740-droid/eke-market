@@ -33,7 +33,7 @@ app.use(express.json());
 // ── IN-MEMORY CACHE ──
 const cache: Record<string, { data: any; timestamp: number }> = {};
 const CACHE_DURATION = 60 * 1000; // 60 seconds for general data
-const COIN_DETAIL_CACHE = 5 * 60 * 1000; // 5 minutes for coin details (reduce API calls)
+const COIN_DETAIL_CACHE = 30 * 60 * 1000; // 30 minutes for coin details (reduce API calls)
 const CHART_CACHE = 3 * 60 * 1000; // 3 minutes for charts
 
 const getCached = (key: string, customDuration?: number) => {
@@ -195,6 +195,39 @@ const mockCoins: Record<string, any> = {
   }
 };
 
+// Helper: Convert coins list data to detail format for fallback
+const convertListCoinToDetail = (coin: any) => ({
+  id: coin.id,
+  symbol: coin.symbol?.toLowerCase() || '',
+  name: coin.name || '',
+  web_slug: coin.web_slug || coin.id,
+  image: { large: coin.image || '' },
+  market_cap_rank: coin.market_cap_rank || 0,
+  market_data: {
+    current_price: { usd: coin.current_price || 0 },
+    market_cap: { usd: coin.market_cap || 0 },
+    total_volume: { usd: coin.total_volume || 0 },
+    circulating_supply: coin.circulating_supply || 0,
+    total_supply: coin.total_supply || null,
+    max_supply: coin.max_supply || null,
+    ath: { usd: coin.ath || 0 },
+    ath_change_percentage: { usd: coin.ath_change_percentage || 0 },
+    ath_date: { usd: coin.ath_date || '' },
+    atl: { usd: coin.atl || 0 },
+    atl_change_percentage: { usd: coin.atl_change_percentage || 0 },
+    atl_date: { usd: coin.atl_date || '' },
+    price_change_24h: coin.price_change_24h || 0,
+    price_change_percentage_24h: coin.price_change_percentage_24h || 0,
+    market_cap_change_24h: coin.market_cap_change_24h || 0,
+    market_cap_change_percentage_24h: coin.market_cap_change_percentage_24h || 0,
+    high_24h: { usd: coin.high_24h || 0 },
+    low_24h: { usd: coin.low_24h || 0 },
+    fully_diluted_valuation: { usd: coin.fully_diluted_valuation || null },
+    last_updated: coin.last_updated || new Date().toISOString()
+  },
+  last_updated: coin.last_updated || new Date().toISOString()
+});
+
 // Single coin detail
 app.get('/api/coins/:id', async (req, res) => {
   const { id } = req.params;
@@ -238,6 +271,16 @@ app.get('/api/coins/:id', async (req, res) => {
     if (mockCoins[id]) {
       console.log(`Using mock data for ${id}`);
       return res.json({ success: true, data: mockCoins[id], source: 'mock' });
+    }
+    // NEW: Try to find coin from cached coins list as fallback
+    const coinsListCached = getCached('coins');
+    if (coinsListCached && Array.isArray(coinsListCached)) {
+      const foundCoin = coinsListCached.find((c: any) => c.id === id);
+      if (foundCoin) {
+        console.log(`Using coins list fallback for ${id}`);
+        const detailData = convertListCoinToDetail(foundCoin);
+        return res.json({ success: true, data: detailData, source: 'list_fallback' });
+      }
     }
     res.status(503).json({ success: false, error: 'Coin data unavailable', data: null });
   }
