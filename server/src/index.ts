@@ -81,11 +81,12 @@ app.get('/api/coins', async (req, res) => {
         'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true&price_change_percentage=1h,24h,7d',
         { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
       );
-      if (!response.ok) throw new Error('CoinGecko failed');
+      if (!response.ok) throw new Error(`CoinGecko failed: ${response.status} ${response.statusText}`);
       return response.json();
     });
     res.json({ success: true, data });
   } catch (err) {
+    console.error('API coins error:', err);
     res.status(503).json({ success: false, error: 'Market data unavailable', data: [] });
   }
 });
