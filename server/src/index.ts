@@ -17,14 +17,14 @@ app.use(cors({
   credentials: false,
 }));
 
-// Handle preflight requests explicitly
-app.options('*', cors());
-
-// Manual CORS headers as safety net
+// Handle preflight requests explicitly for all routes
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    return res.sendStatus(200);
+  }
   next();
 });
 
