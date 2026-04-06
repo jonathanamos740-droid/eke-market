@@ -1,0 +1,20 @@
+# Placeholder for assets
+
+## Required files:
+1. beat.mp3 - Background music (royalty-free bouncy track from Pixabay/Mixkit)
+2. screen1.png - Homepage screenshot (1920x1080)
+3. screen2.png - Coin detail page screenshot (1920x1080)
+4. screen3.png - Global stats screenshot (1920x1080)
+
+## Instructions:
+1. Download a royalty-free upbeat track from Pixabay.com or Mixkit.co
+   - Search for: "upbeat", "bouncy", "corporate", "tech"
+   - Save as beat.mp3 in this folder
+
+2. Take screenshots of the Eke Market app:
+   - screen1.png: Homepage with coin list
+   - screen2.png: Coin detail page with charts
+   - screen3.png: Global market stats or Gainers/Losers page
+   - Recommended size: 1920x1080 or higher
+
+3. Place all files in this public/ folder
