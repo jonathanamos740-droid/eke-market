@@ -228,7 +228,7 @@ const convertListCoinToDetail = (coin: any) => ({
   last_updated: coin.last_updated || new Date().toISOString()
 });
 
-// Single coin detail
+// Single coin detail with search fallback for ID resolution
 app.get('/api/coins/:id', async (req, res) => {
   const { id } = req.params;
   const cacheKey = `coin_${id}`;
@@ -240,13 +240,42 @@ app.get('/api/coins/:id', async (req, res) => {
   }
   
   try {
-    const response = await fetch(
+    // First try direct ID lookup
+    let response = await fetch(
       `https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false`,
       { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
     );
     
+    // If that fails, try searching by the id as a query to get correct ID
     if (!response.ok) {
-      // If rate limited, return cached or fallback data
+      console.log(`Direct lookup failed for coin ID: ${id}, trying search...`);
+      const searchRes = await fetch(
+        `https://api.coingecko.com/api/v3/search?query=${id}`,
+        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
+      );
+      
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const match = searchData.coins?.[0];
+        
+        if (match && match.id) {
+          console.log(`Found correct ID via search: ${match.id} for query: ${id}`);
+          // Retry with correct ID from search
+          response = await fetch(
+            `https://api.coingecko.com/api/v3/coins/${match.id}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false`,
+            { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
+          );
+          
+          if (response.ok) {
+            const data = await response.json();
+            setCache(cacheKey, data);
+            lastGood[cacheKey] = data;
+            return res.json({ success: true, data, source: 'live' });
+          }
+        }
+      }
+      
+      // If search also fails, try fallbacks
       if (lastGood[cacheKey]) {
         return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
       }
@@ -263,6 +292,8 @@ app.get('/api/coins/:id', async (req, res) => {
     lastGood[cacheKey] = data;
     res.json({ success: true, data, source: 'live' });
   } catch (err) {
+    console.error(`Failed to fetch coin: ${id}`, err);
+    
     // Return fallback data if available
     if (lastGood[cacheKey]) {
       return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
@@ -272,7 +303,7 @@ app.get('/api/coins/:id', async (req, res) => {
       console.log(`Using mock data for ${id}`);
       return res.json({ success: true, data: mockCoins[id], source: 'mock' });
     }
-    // NEW: Try to find coin from cached coins list as fallback
+    // Try to find coin from cached coins list as fallback
     const coinsListCached = getCached('coins');
     if (coinsListCached && Array.isArray(coinsListCached)) {
       const foundCoin = coinsListCached.find((c: any) => c.id === id);

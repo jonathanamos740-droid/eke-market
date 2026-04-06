@@ -48,10 +48,13 @@ const PRESET_AMOUNTS = [1, 10, 100, 1000];
 
 export function CoinDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data: coin, loading: coinLoading } = useCoinDetail(id);
+  const { data: coin, loading: coinLoading, error: coinError, refetch } = useCoinDetail(id);
   const { data: historyData } = useCoinHistory(id, 'max');
   const { toggleWatchlist, isInWatchlist } = useWatchlist();
   const { rates: exchangeRates } = useExchangeRates();
+  
+  // Error state for retry functionality
+  const [showError, setShowError] = useState(false);
   
   // Fetch top cryptos for fallback when detail API fails
   const { data: topCryptos } = useTopCryptos(1, 100);
@@ -60,6 +63,64 @@ export function CoinDetail() {
   const fallbackCoin = topCryptos?.find(c => c.id === id);
   const displayCoin = coin || fallbackCoin;
   const isUsingFallback = !coin && !!fallbackCoin;
+  
+  // Handle retry
+  const handleRetry = () => {
+    setShowError(false);
+    if (refetch) refetch();
+  };
+  
+  // Show error state if all data sources failed
+  if (!coinLoading && !displayCoin && (coinError || showError)) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#0D0D0F',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          fontFamily: 'Inter, sans-serif',
+        }}
+      >
+        <p style={{ color: '#666', fontSize: 16 }}>
+          Could not load coin data
+        </p>
+        <button
+          onClick={handleRetry}
+          style={{
+            background: '#BA7517',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            padding: '10px 28px',
+            fontSize: 14,
+            cursor: 'pointer',
+            fontFamily: 'Inter, sans-serif',
+          }}
+        >
+          Retry
+        </button>
+        <button
+          onClick={() => window.history.back()}
+          style={{
+            background: 'transparent',
+            color: '#BA7517',
+            border: '1px solid #BA7517',
+            borderRadius: 8,
+            padding: '10px 28px',
+            fontSize: 14,
+            cursor: 'pointer',
+            fontFamily: 'Inter, sans-serif',
+          }}
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
   
   // Converter state
   const [showConverter, setShowConverter] = useState(false);
