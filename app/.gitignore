@@ -37,3 +37,4 @@ out/
 
 # Coverage
 coverage
+.vercel
