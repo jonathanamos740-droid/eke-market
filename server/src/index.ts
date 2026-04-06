@@ -31,12 +31,15 @@ app.use(express.json());
 
 // ── IN-MEMORY CACHE ──
 const cache: Record<string, { data: any; timestamp: number }> = {};
-const CACHE_DURATION = 60 * 1000; // 60 seconds
+const CACHE_DURATION = 60 * 1000; // 60 seconds for general data
+const COIN_DETAIL_CACHE = 5 * 60 * 1000; // 5 minutes for coin details (reduce API calls)
+const CHART_CACHE = 3 * 60 * 1000; // 3 minutes for charts
 
-const getCached = (key: string) => {
+const getCached = (key: string, customDuration?: number) => {
   const entry = cache[key];
   if (!entry) return null;
-  if (Date.now() - entry.timestamp > CACHE_DURATION) return null;
+  const duration = customDuration || CACHE_DURATION;
+  if (Date.now() - entry.timestamp > duration) return null;
   return entry.data;
 };
 
@@ -89,17 +92,37 @@ app.get('/api/coins', async (req, res) => {
 // Single coin detail
 app.get('/api/coins/:id', async (req, res) => {
   const { id } = req.params;
+  const cacheKey = `coin_${id}`;
+  
+  // Check cache first with longer duration
+  const cached = getCached(cacheKey, COIN_DETAIL_CACHE);
+  if (cached) {
+    return res.json({ success: true, data: cached, source: 'cache' });
+  }
+  
   try {
-    const { data } = await fetchWithFallback(`coin_${id}`, async () => {
-      const response = await fetch(
-        `https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false`,
-        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
-      );
-      if (!response.ok) throw new Error('CoinGecko failed');
-      return response.json();
-    });
-    res.json({ success: true, data });
+    const response = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false`,
+      { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
+    );
+    
+    if (!response.ok) {
+      // If rate limited, return cached or fallback data
+      if (lastGood[cacheKey]) {
+        return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
+      }
+      throw new Error('CoinGecko failed');
+    }
+    
+    const data = await response.json();
+    setCache(cacheKey, data);
+    lastGood[cacheKey] = data;
+    res.json({ success: true, data, source: 'live' });
   } catch (err) {
+    // Return fallback data if available
+    if (lastGood[cacheKey]) {
+      return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
+    }
     res.status(503).json({ success: false, error: 'Coin data unavailable', data: null });
   }
 });
@@ -108,17 +131,35 @@ app.get('/api/coins/:id', async (req, res) => {
 app.get('/api/coins/:id/chart', async (req, res) => {
   const { id } = req.params;
   const { days = '7' } = req.query;
+  const cacheKey = `chart_${id}_${days}`;
+  
+  // Check cache first
+  const cached = getCached(cacheKey, CHART_CACHE);
+  if (cached) {
+    return res.json({ success: true, data: cached, source: 'cache' });
+  }
+  
   try {
-    const { data } = await fetchWithFallback(`chart_${id}_${days}`, async () => {
-      const response = await fetch(
-        `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`,
-        { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
-      );
-      if (!response.ok) throw new Error('CoinGecko failed');
-      return response.json();
-    });
-    res.json({ success: true, data });
+    const response = await fetch(
+      `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`,
+      { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
+    );
+    
+    if (!response.ok) {
+      if (lastGood[cacheKey]) {
+        return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
+      }
+      throw new Error('CoinGecko failed');
+    }
+    
+    const data = await response.json();
+    setCache(cacheKey, data);
+    lastGood[cacheKey] = data;
+    res.json({ success: true, data, source: 'live' });
   } catch (err) {
+    if (lastGood[cacheKey]) {
+      return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
+    }
     res.status(503).json({ success: false, error: 'Chart data unavailable', data: null });
   }
 });

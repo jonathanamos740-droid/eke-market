@@ -71,7 +71,42 @@ export const cryptoApi = {
       if (!result.success || !result.data) {
         throw new Error('Coin data unavailable');
       }
-      return result.data as CryptoDetail;
+      
+      const coin = result.data;
+      
+      // Transform CoinGecko detail response to our CryptoDetail format
+      // CoinGecko detail API returns nested market_data
+      const marketData = coin.market_data || coin;
+      
+      return {
+        id: coin.id,
+        symbol: coin.symbol?.toLowerCase() || '',
+        name: coin.name || '',
+        web_slug: coin.web_slug || coin.id,
+        image: coin.image?.large || coin.image?.small || coin.image?.thumb || '',
+        current_price: marketData.current_price?.usd || marketData.current_price || 0,
+        market_cap: marketData.market_cap?.usd || marketData.market_cap || 0,
+        market_cap_rank: coin.market_cap_rank || 0,
+        fully_diluted_valuation: marketData.fully_diluted_valuation?.usd || marketData.fully_diluted_valuation || null,
+        total_volume: marketData.total_volume?.usd || marketData.total_volume || 0,
+        high_24h: marketData.high_24h?.usd || marketData.high_24h || 0,
+        low_24h: marketData.low_24h?.usd || marketData.low_24h || 0,
+        price_change_24h: marketData.price_change_24h || 0,
+        price_change_percentage_24h: marketData.price_change_percentage_24h || 0,
+        market_cap_change_24h: marketData.market_cap_change_24h || 0,
+        market_cap_change_percentage_24h: marketData.market_cap_change_percentage_24h || 0,
+        circulating_supply: marketData.circulating_supply || 0,
+        total_supply: marketData.total_supply || marketData.max_supply || null,
+        max_supply: marketData.max_supply || null,
+        ath: marketData.ath?.usd || marketData.ath || 0,
+        ath_change_percentage: marketData.ath_change_percentage?.usd || marketData.ath_change_percentage || 0,
+        ath_date: marketData.ath_date?.usd || marketData.ath_date || '',
+        atl: marketData.atl?.usd || marketData.atl || 0,
+        atl_change_percentage: marketData.atl_change_percentage?.usd || marketData.atl_change_percentage || 0,
+        atl_date: marketData.atl_date?.usd || marketData.atl_date || '',
+        roi: marketData.roi || null,
+        last_updated: coin.last_updated || marketData.last_updated || new Date().toISOString(),
+      } as CryptoDetail;
     } catch (error) {
       console.error(`Failed to fetch coin detail for ${id}:`, error);
       throw new Error('Failed to fetch coin details');

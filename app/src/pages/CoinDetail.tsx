@@ -14,7 +14,8 @@ import {
   Wifi,
   ArrowRightLeft,
   Copy,
-  Check
+  Check,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +50,7 @@ const PRESET_AMOUNTS = [1, 10, 100, 1000];
 
 export function CoinDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data: coin, loading: coinLoading, error: coinError } = useCoinDetail(id);
+  const { data: coin, loading: coinLoading, error: coinError, refetch: refetchCoin } = useCoinDetail(id);
   const { data: historyData } = useCoinHistory(id, 'max');
   const { toggleWatchlist, isInWatchlist } = useWatchlist();
   const { rates: exchangeRates } = useExchangeRates();
@@ -98,7 +99,7 @@ export function CoinDetail() {
     ? 'text-red-400 animate-pulse' 
     : '';
 
-  if (coinLoading) {
+  if (coinLoading && !coin) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -108,19 +109,41 @@ export function CoinDetail() {
     );
   }
 
-  if (coinError || !coin) {
+  // Show error with retry option
+  if (coinError && !coin) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
           <div className="text-center py-16">
-            <p className="text-red-400 mb-4">{coinError || 'Coin not found'}</p>
-            <Link to="/">
-              <Button variant="outline" className="border-white/10 hover:bg-white/5">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Markets
+            <p className="text-red-400 mb-4">{coinError}</p>
+            <div className="flex items-center justify-center gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => refetchCoin()}
+                className="border-white/10 hover:bg-white/5 gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Retry
               </Button>
-            </Link>
+              <Link to="/">
+                <Button variant="outline" className="border-white/10 hover:bg-white/5">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Markets
+                </Button>
+              </Link>
+            </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Safety check - if coin is still null (shouldn't happen after error check)
+  if (!coin) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <CoinDetailSkeleton />
         </div>
       </div>
     );

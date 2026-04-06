@@ -45,33 +45,33 @@ export const useCoinDetail = (id: string | undefined) => {
   const [loading, setLoading] = useState(!stale && !!id);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!id) return;
     
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const coin = await cryptoApi.getCoinDetail(id);
-        setData(coin);
-        if (cacheKey) localCache.set(cacheKey, coin);
-      } catch (err) {
-        const errorMsg = handleApiError(err);
-        setError(errorMsg);
-        const fallback = cacheKey ? localCache.getStale(cacheKey) : null;
-        if (fallback) {
-          setData(fallback);
-          setError('Showing cached data — ' + errorMsg);
-        }
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      const coin = await cryptoApi.getCoinDetail(id);
+      setData(coin);
+      if (cacheKey) localCache.set(cacheKey, coin);
+    } catch (err) {
+      const errorMsg = handleApiError(err);
+      setError(errorMsg);
+      const fallback = cacheKey ? localCache.getStale(cacheKey) : null;
+      if (fallback) {
+        setData(fallback);
+        setError('Showing cached data — ' + errorMsg);
       }
-    };
-
-    fetchData();
+    } finally {
+      setLoading(false);
+    }
   }, [id, cacheKey]);
 
-  return { data, loading, error };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, loading, error, refetch: fetchData };
 };
 
 export const useCoinHistory = (id: string | undefined, days: number | 'max' = 7) => {
@@ -81,33 +81,33 @@ export const useCoinHistory = (id: string | undefined, days: number | 'max' = 7)
   const [loading, setLoading] = useState(!stale && !!id);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!id) return;
     
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const history = await cryptoApi.getCoinHistory(id, days);
-        setData(history);
-        if (cacheKey) localCache.set(cacheKey, history);
-      } catch (err) {
-        const errorMsg = handleApiError(err);
-        setError(errorMsg);
-        const fallback = cacheKey ? localCache.getStale(cacheKey) : null;
-        if (fallback) {
-          setData(fallback);
-          setError('Showing cached data — ' + errorMsg);
-        }
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      const history = await cryptoApi.getCoinHistory(id, days);
+      setData(history);
+      if (cacheKey) localCache.set(cacheKey, history);
+    } catch (err) {
+      const errorMsg = handleApiError(err);
+      setError(errorMsg);
+      const fallback = cacheKey ? localCache.getStale(cacheKey) : null;
+      if (fallback) {
+        setData(fallback);
+        setError('Showing cached data — ' + errorMsg);
       }
-    };
-
-    fetchData();
+    } finally {
+      setLoading(false);
+    }
   }, [id, days, cacheKey]);
 
-  return { data, loading, error };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  return { data, loading, error, refetch: fetchData };
 };
 
 export const useGlobalData = () => {

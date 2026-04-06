@@ -25,15 +25,15 @@ export function PriceChart({ data, isPositive, loading = false }: PriceChartProp
   const chartData = useMemo(() => {
     if (!data?.prices || data.prices.length === 0) return [];
     
-    // Filter data based on selected range
-    const now = Date.now();
+    // Get the most recent timestamp from the data to use as reference
+    const latestTimestamp = data.prices[data.prices.length - 1][0];
     const rangeMs = parseInt(selectedRange) * 24 * 60 * 60 * 1000;
-    const cutoff = now - rangeMs;
+    const cutoff = latestTimestamp - rangeMs;
     
     // Filter to get data within the selected time range
     const filtered = data.prices.filter(([timestamp]) => timestamp >= cutoff);
     
-    // If no data in range, use the most recent data points as fallback
+    // If no data in range (data too old), use the most recent data points as fallback
     if (filtered.length === 0) {
       // Get the last N data points based on selected range
       const dataPoints = parseInt(selectedRange) * 24; // roughly one point per hour
