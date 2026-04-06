@@ -44,6 +44,7 @@ export const useCoinDetail = (id: string | undefined) => {
   const [data, setData] = useState<CryptoDetail | null>(stale || null);
   const [loading, setLoading] = useState(!stale && !!id);
   const [error, setError] = useState<string | null>(null);
+  const [isFallback, setIsFallback] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -51,6 +52,7 @@ export const useCoinDetail = (id: string | undefined) => {
     try {
       setLoading(true);
       setError(null);
+      setIsFallback(false);
       const coin = await cryptoApi.getCoinDetail(id);
       setData(coin);
       if (cacheKey) localCache.set(cacheKey, coin);
@@ -60,6 +62,7 @@ export const useCoinDetail = (id: string | undefined) => {
       const fallback = cacheKey ? localCache.getStale(cacheKey) : null;
       if (fallback) {
         setData(fallback);
+        setIsFallback(true);
         setError('Showing cached data — ' + errorMsg);
       }
     } finally {
@@ -71,7 +74,7 @@ export const useCoinDetail = (id: string | undefined) => {
     fetchData();
   }, [fetchData]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { data, loading, error, refetch: fetchData, isFallback };
 };
 
 export const useCoinHistory = (id: string | undefined, days: number | 'max' = 7) => {
