@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { api } from '@/api/client';
 
 interface FearGreedData {
   value: number;
@@ -13,13 +14,17 @@ export function FearGreedIndex() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch('https://api.alternative.me/fng/?limit=1');
-        const result = await response.json();
-        if (result.data && result.data.length > 0) {
-          setData(result.data[0]);
+        const result = await api.getFearGreed();
+        if (result.success && result.data?.data && result.data.data.length > 0) {
+          setData(result.data.data[0]);
+        } else {
+          // Fallback data if API fails
+          setData({ value: 50, value_classification: 'Neutral', timestamp: new Date().toISOString() });
         }
       } catch (error) {
         console.error('Failed to fetch fear & greed index:', error);
+        // Fallback data
+        setData({ value: 50, value_classification: 'Neutral', timestamp: new Date().toISOString() });
       } finally {
         setLoading(false);
       }

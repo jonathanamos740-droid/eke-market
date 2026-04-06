@@ -190,6 +190,94 @@ app.get('/api/rates', async (req, res) => {
   }
 });
 
+// Coin search
+app.get('/api/search', async (req, res) => {
+  const { query } = req.query;
+  try {
+    const { data } = await fetchWithFallback(`search_${query}`, async () => {
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/search?query=${query}`
+      );
+      if (!response.ok) throw new Error('Search failed');
+      return response.json();
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Search unavailable', data: null });
+  }
+});
+
+// Top gainers and losers
+app.get('/api/gainers-losers', async (req, res) => {
+  try {
+    const { data } = await fetchWithFallback('gainers_losers', async () => {
+      const response = await fetch(
+        'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&price_change_percentage=24h'
+      );
+      if (!response.ok) throw new Error('Gainers losers failed');
+      return response.json();
+    });
+    // Sort for gainers and losers on the server side
+    const sorted = [...data].sort((a: any, b: any) =>
+      (b.price_change_percentage_24h || 0) - (a.price_change_percentage_24h || 0)
+    );
+    res.json({
+      success: true,
+      data: {
+        gainers: sorted.filter((c: any) => (c.price_change_percentage_24h || 0) > 0).slice(0, 10),
+        losers: sorted.filter((c: any) => (c.price_change_percentage_24h || 0) < 0).slice(0, 10),
+      }
+    });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Data unavailable', data: null });
+  }
+});
+
+// Coin comparison — fetch multiple coins at once
+app.get('/api/compare', async (req, res) => {
+  const { ids } = req.query; // comma separated e.g. bitcoin,ethereum,solana
+  try {
+    const { data } = await fetchWithFallback(`compare_${ids}`, async () => {
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=10&page=1&sparkline=true&price_change_percentage=1h,24h,7d`
+      );
+      if (!response.ok) throw new Error('Comparison failed');
+      return response.json();
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Comparison unavailable', data: null });
+  }
+});
+
+// Fear and greed index
+app.get('/api/fear-greed', async (req, res) => {
+  try {
+    const { data } = await fetchWithFallback('fear_greed', async () => {
+      const response = await fetch('https://api.alternative.me/fng/?limit=1');
+      if (!response.ok) throw new Error('Fear greed failed');
+      return response.json();
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Fear greed unavailable', data: null });
+  }
+});
+
+// Binance real-time prices for multiple symbols
+app.get('/api/prices', async (req, res) => {
+  try {
+    const { data } = await fetchWithFallback('binance_prices', async () => {
+      const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
+      if (!response.ok) throw new Error('Binance failed');
+      return response.json();
+    });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(503).json({ success: false, error: 'Price data unavailable', data: [] });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), cache: Object.keys(cache).length });
