@@ -6,7 +6,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || 'CG-ww38dvoPhso7kYTyXbLrMQ8h';
+const COINGECKO_API_KEY = 'CG-ww38dvoPhso7kYTyXbLrMQ8h';
 
 // ── CORS CONFIGURATION ──
 app.use(cors({
