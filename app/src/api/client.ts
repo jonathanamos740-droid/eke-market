@@ -43,4 +43,7 @@ export const api = {
   getGainersLosers: () => apiFetch('/api/gainers-losers'),
   compareCoins: (ids: string[]) => apiFetch(`/api/compare?ids=${ids.join(',')}`),
   getFearGreed: () => apiFetch('/api/fear-greed'),
+  // Live prices from WebSocket
+  getLivePrices: () => apiFetch('/api/live-prices'),
+  getLivePrice: (symbol: string) => apiFetch(`/api/live-prices/${symbol}`),
 };

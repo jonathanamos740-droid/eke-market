@@ -2,12 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
+import WebSocket from 'ws';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const COINGECKO_API_KEY = 'CG-ww38dvoPhso7kYTyXbLrMQ8h';
+const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY || 'CG-ww38dvoPhso7kYTyXbLrMQ8h';
 
 // ── CORS CONFIGURATION ──
 app.use(cors({
@@ -29,6 +30,75 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+// ── LIVE PRICES WEBSOCKET MANAGER ──
+const livePrices: Record<string, any> = {};
+
+// Store coin symbol to Binance symbol mapping
+const coinToBinanceSymbol: Record<string, string> = {
+  bitcoin: 'BTCUSDT', ethereum: 'ETHUSDT', bnb: 'BNBUSDT',
+  solana: 'SOLUSDT', ripple: 'XRPUSDT', cardano: 'ADAUSDT',
+  dogecoin: 'DOGEUSDT', avalanche: 'AVAXUSDT', 'polygon-ecosystem-token': 'MATICUSDT',
+  polkadot: 'DOTUSDT', chainlink: 'LINKUSDT', uniswap: 'UNIUSDT',
+  litecoin: 'LTCUSDT', cosmos: 'ATOMUSDT', tron: 'TRXUSDT',
+  'shiba-inu': 'SHIBUSDT', near: 'NEARUSDT', stellar: 'XLMUSDT',
+  monero: 'XMRUSDT', 'bitcoin-cash': 'BCHUSDT',
+};
+
+// Binance symbols to stream
+const binanceSymbols = [
+  'btcusdt', 'ethusdt', 'bnbusdt', 'solusdt', 'xrpusdt',
+  'adausdt', 'dogeusdt', 'avaxusdt', 'maticusdt', 'dotusdt',
+  'linkusdt', 'uniusdt', 'ltcusdt', 'atomusdt', 'trxusdt',
+  'shibusdt', 'nearusdt', 'ftmusdt', 'algousdt', 'xlmusdt',
+  'xmrusdt', 'bchusdt',
+];
+
+const streamNames = binanceSymbols.map(s => `${s}@ticker`).join('/');
+const BINANCE_WS = `wss://stream.binance.com:9443/stream?streams=${streamNames}`;
+
+let ws: WebSocket | null = null;
+
+const connectBinanceWS = () => {
+  ws = new WebSocket(BINANCE_WS);
+
+  ws.on('open', () => {
+    console.log('✅ Binance WebSocket connected');
+  });
+
+  ws.on('message', (raw: Buffer) => {
+    try {
+      const parsed = JSON.parse(raw.toString());
+      const ticker = parsed.data;
+      if (ticker && ticker.s) {
+        livePrices[ticker.s] = {
+          symbol: ticker.s,
+          price: parseFloat(ticker.c),
+          change24h: parseFloat(ticker.P),
+          high24h: parseFloat(ticker.h),
+          low24h: parseFloat(ticker.l),
+          volume24h: parseFloat(ticker.v),
+          updatedAt: Date.now(),
+        };
+      }
+    } catch (err) {
+      console.error('WS parse error:', err);
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('⚠️ Binance WS closed — reconnecting in 3s');
+    setTimeout(connectBinanceWS, 3000);
+  });
+
+  ws.on('error', (err) => {
+    console.error('Binance WS error:', err);
+    ws?.close();
+  });
+};
+
+// Start WebSocket on server boot
+connectBinanceWS();
 
 // ── IN-MEMORY CACHE ──
 const cache: Record<string, { data: any; timestamp: number }> = {};
@@ -317,11 +387,29 @@ app.get('/api/coins/:id', async (req, res) => {
   }
 });
 
-// Coin chart history
+// Live prices from WebSocket
+app.get('/api/live-prices', (req, res) => {
+  res.json({ success: true, data: livePrices });
+});
+
+// Single coin live price
+app.get('/api/live-prices/:symbol', (req, res) => {
+  const symbol = req.params.symbol.toUpperCase();
+  const binanceSymbol = symbol.endsWith('USDT') ? symbol : `${symbol}USDT`;
+  const price = livePrices[binanceSymbol];
+  if (!price) {
+    return res.json({ success: false, error: 'Symbol not found', data: null });
+  }
+  res.json({ success: true, data: price });
+});
+
+// Coin chart history with improved error handling
 app.get('/api/coins/:id/chart', async (req, res) => {
   const { id } = req.params;
-  const { days = '7' } = req.query;
+  const { days = '7', interval = 'daily' } = req.query;
   const cacheKey = `chart_${id}_${days}`;
+  
+  console.log(`📊 Fetching chart for: ${id}, days: ${days}`);
   
   // Check cache first
   const cached = getCached(cacheKey, CHART_CACHE);
@@ -330,26 +418,35 @@ app.get('/api/coins/:id/chart', async (req, res) => {
   }
   
   try {
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}`,
-      { headers: { 'x-cg-demo-api-key': COINGECKO_API_KEY } }
-    );
-    
-    if (!response.ok) {
-      if (lastGood[cacheKey]) {
-        return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
+    const { data } = await fetchWithFallback(cacheKey, async () => {
+      const url = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}&interval=${interval}`;
+      console.log('Chart URL:', url);
+
+      const response = await fetch(url, {
+        headers: {
+          'x-cg-demo-api-key': COINGECKO_API_KEY,
+          'Accept': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Chart fetch failed: ${response.status}`, errorText);
+        throw new Error(`Chart failed: ${response.status}`);
       }
-      throw new Error('CoinGecko failed');
-    }
-    
-    const data = await response.json();
-    setCache(cacheKey, data);
-    lastGood[cacheKey] = data;
+
+      const json = await response.json();
+
+      if (!json.prices || json.prices.length === 0) {
+        throw new Error('Empty chart data');
+      }
+
+      return json;
+    });
+
     res.json({ success: true, data, source: 'live' });
   } catch (err) {
-    if (lastGood[cacheKey]) {
-      return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
-    }
+    console.error(`Chart error for ${id}:`, err);
     res.status(503).json({ success: false, error: 'Chart data unavailable', data: null });
   }
 });
