@@ -37,11 +37,27 @@ export const cryptoApi = {
   getTopCryptos: async (page = 1, perPage = 50): Promise<CryptoAsset[]> => {
     try {
       const result = await api.getCoins();
-      if (!result.success || !result.data) return [];
+      console.log('API Response:', result);
+      
+      // Handle different response formats
+      let data = null;
+      if (result.success && result.data) {
+        data = result.data;
+      } else if (Array.isArray(result)) {
+        // Direct array response
+        data = result;
+      } else if (result.data) {
+        data = result.data;
+      }
+      
+      if (!data || !Array.isArray(data)) {
+        console.error('Invalid data format:', result);
+        return [];
+      }
       
       const start = (page - 1) * perPage;
       const end = start + perPage;
-      return result.data.slice(start, end).map(convertCoinGeckoAsset);
+      return data.slice(start, end).map(convertCoinGeckoAsset);
     } catch (error) {
       console.error('Failed to fetch top cryptos:', error);
       return [];

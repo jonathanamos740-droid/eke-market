@@ -15,7 +15,9 @@ export function MarketOverview() {
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   
-  const { data: cryptos, loading: cryptosLoading, error: cryptosError } = useTopCryptos(page, 20);
+  // Load more items when searching to improve search results
+  const itemsPerPage = searchQuery ? 100 : 20;
+  const { data: cryptos, loading: cryptosLoading, error: cryptosError } = useTopCryptos(page, itemsPerPage);
   const { data: globalData, loading: globalLoading } = useGlobalData();
   const { data: trendingCoins, loading: trendingLoading } = useTrendingCoins();
   const { toggleWatchlist, isInWatchlist } = useWatchlist();

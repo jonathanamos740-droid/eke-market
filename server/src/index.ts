@@ -7,10 +7,24 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ── CORS CONFIGURATION ──
 app.use(cors({
-  origin: ['https://eke-market.vercel.app', 'http://localhost:5173', 'https://eke-market-masgfnxly-amosjonathan310-3258s-projects.vercel.app'],
-  methods: ['GET'],
+  origin: '*',
+  methods: ['GET', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
+
+// Manual CORS headers as safety net
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
 
 app.use(express.json());
 
