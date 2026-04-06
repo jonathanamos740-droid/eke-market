@@ -18,15 +18,13 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useCoinDetail, useCoinHistory, useWatchlist, useExchangeRates } from '@/hooks/useCrypto';
+import { useCoinDetail, useCoinHistory, useWatchlist, useExchangeRates, useTopCryptos } from '@/hooks/useCrypto';
 import { PriceChart } from '@/components/PriceChart';
 import { CoinDetailSkeleton } from '@/components/LoadingSkeleton';
 import { formatPrice, formatCompactNumber, formatPercentage, formatDate } from '@/lib/utils';
 import { useLivePrice } from '@/hooks/useLivePrices';
 import { AIAnalysis } from '@/components/AIAnalysis';
 import { CoinImage } from '@/components/CoinImage';
-import { NetworkError } from '@/components/NetworkError';
-
 // Supported currencies for converter
 const CURRENCIES = [
   { value: 'usd', label: 'USD', symbol: '$' },
@@ -50,10 +48,18 @@ const PRESET_AMOUNTS = [1, 10, 100, 1000];
 
 export function CoinDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data: coin, loading: coinLoading, error: coinError, refetch: refetchCoin } = useCoinDetail(id);
+  const { data: coin, loading: coinLoading } = useCoinDetail(id);
   const { data: historyData } = useCoinHistory(id, 'max');
   const { toggleWatchlist, isInWatchlist } = useWatchlist();
   const { rates: exchangeRates } = useExchangeRates();
+  
+  // Fetch top cryptos for fallback when detail API fails
+  const { data: topCryptos } = useTopCryptos(1, 100);
+  
+  // Find coin from market list as fallback
+  const fallbackCoin = topCryptos?.find(c => c.id === id);
+  const displayCoin = coin || fallbackCoin;
+  const isUsingFallback = !coin && !!fallbackCoin;
   
   // Converter state
   const [showConverter, setShowConverter] = useState(false);
@@ -62,7 +68,7 @@ export function CoinDetail() {
   const [copied, setCopied] = useState(false);
   
   // Calculate conversion
-  const coinPriceUSD = coin?.current_price || 0;
+  const coinPriceUSD = displayCoin?.current_price || 0;
   const targetRate = exchangeRates[convertTo] || 1;
   const convertedValue = convertAmount * coinPriceUSD * targetRate;
   
@@ -99,7 +105,7 @@ export function CoinDetail() {
     ? 'text-red-400 animate-pulse' 
     : '';
 
-  if (coinLoading && !coin) {
+  if (coinLoading && !coin && !fallbackCoin) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -109,18 +115,8 @@ export function CoinDetail() {
     );
   }
 
-  // Show NetworkError component when there's an error and no data
-  if (coinError && !coin) {
-    return (
-      <NetworkError 
-        onRetry={() => refetchCoin()}
-        message={coinError}
-      />
-    );
-  }
-
-  // Safety check - if coin is still null (shouldn't happen after error check)
-  if (!coin) {
+  // Safety check - if no coin data available at all
+  if (!displayCoin) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -130,28 +126,28 @@ export function CoinDetail() {
     );
   }
 
-  const isPositive = (coin.price_change_percentage_24h || 0) >= 0;
-  const inWatchlist = isInWatchlist(coin.id);
+  const isPositive = (displayCoin.price_change_percentage_24h || 0) >= 0;
+  const inWatchlist = isInWatchlist(displayCoin.id);
 
   const stats = [
     {
       label: 'Market Cap',
-      value: formatCompactNumber(coin.market_cap),
+      value: formatCompactNumber(displayCoin.market_cap),
       icon: DollarSign,
     },
     {
       label: '24h Volume',
-      value: formatCompactNumber(coin.total_volume),
+      value: formatCompactNumber(displayCoin.total_volume),
       icon: BarChart3,
     },
     {
       label: 'Circulating Supply',
-      value: `${formatCompactNumber(coin.circulating_supply)} ${coin.symbol.toUpperCase()}`,
+      value: `${formatCompactNumber(displayCoin.circulating_supply)} ${displayCoin.symbol.toUpperCase()}`,
       icon: Layers,
     },
     {
       label: 'Rank',
-      value: `#${coin.market_cap_rank}`,
+      value: `#${displayCoin.market_cap_rank}`,
       icon: Activity,
     },
   ];
@@ -159,15 +155,15 @@ export function CoinDetail() {
   const additionalStats = [
     {
       label: 'All-Time High',
-      value: formatPrice(coin.ath),
-      date: `on ${formatDate(coin.ath_date)}`,
-      change: coin.ath_change_percentage,
+      value: formatPrice(displayCoin.ath),
+      date: displayCoin.ath_date ? `on ${formatDate(displayCoin.ath_date)}` : 'N/A',
+      change: displayCoin.ath_change_percentage,
     },
     {
       label: 'All-Time Low',
-      value: formatPrice(coin.atl),
-      date: `on ${formatDate(coin.atl_date)}`,
-      change: coin.atl_change_percentage,
+      value: formatPrice(displayCoin.atl),
+      date: displayCoin.atl_date ? `on ${formatDate(displayCoin.atl_date)}` : 'N/A',
+      change: displayCoin.atl_change_percentage,
     },
   ];
 
@@ -187,29 +183,34 @@ export function CoinDetail() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <CoinImage 
-              src={coin.image} 
-              alt={coin.name}
-              symbol={coin.symbol}
+              src={displayCoin.image} 
+              alt={displayCoin.name}
+              symbol={displayCoin.symbol}
               className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl"
               size={80}
             />
             <div>
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="font-display text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
-                  {coin.name}
+                  {displayCoin.name}
                 </h1>
                 <span className="px-2 py-1 rounded-lg bg-surface-container-high text-muted-foreground text-sm font-medium uppercase">
-                  {coin.symbol}
+                  {displayCoin.symbol}
                 </span>
-                {coin.market_cap_rank && (
+                {displayCoin.market_cap_rank && (
                   <span className="px-2 py-1 rounded-lg bg-stitch-green/20 text-stitch-green text-xs font-medium">
-                    Rank #{coin.market_cap_rank}
+                    Rank #{displayCoin.market_cap_rank}
+                  </span>
+                )}
+                {isUsingFallback && (
+                  <span className="px-2 py-1 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-medium">
+                    Fallback Data
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <a 
-                  href={`https://www.coingecko.com/en/coins/${coin.id}`}
+                  href={`https://www.coingecko.com/en/coins/${displayCoin.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-muted-foreground hover:text-stitch-green transition-colors flex items-center gap-1"
@@ -230,7 +231,7 @@ export function CoinDetail() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => toggleWatchlist(coin.id)}
+            onClick={() => toggleWatchlist(displayCoin.id)}
             className={`
               gap-2 border-white/10 hover:bg-white/5 self-start
               ${inWatchlist ? 'text-stitch-green border-stitch-green/30' : 'text-muted-foreground'}
@@ -262,7 +263,7 @@ export function CoinDetail() {
               ) : (
                 <TrendingDown className="w-4 h-4" />
               )}
-              <span className="font-medium">{formatPercentage(coin.price_change_percentage_24h || 0)}</span>
+              <span className="font-medium">{formatPercentage(displayCoin.price_change_percentage_24h || 0)}</span>
               <span className="text-sm opacity-70">(24h)</span>
             </div>
           </div>
@@ -271,19 +272,19 @@ export function CoinDetail() {
           <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <span>Low:</span>
-              <span className="text-white font-medium">{formatPrice(coin.low_24h)}</span>
+              <span className="text-white font-medium">{formatPrice(displayCoin.low_24h)}</span>
             </div>
             <div className="flex-1 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-red-400 to-stitch-green rounded-full"
                 style={{ 
-                  width: `${((coin.current_price - coin.low_24h) / (coin.high_24h - coin.low_24h)) * 100}%` 
+                  width: `${((displayCoin.current_price - displayCoin.low_24h) / (displayCoin.high_24h - displayCoin.low_24h)) * 100}%` 
                 }}
               />
             </div>
             <div className="flex items-center gap-1">
               <span>High:</span>
-              <span className="text-white font-medium">{formatPrice(coin.high_24h)}</span>
+              <span className="text-white font-medium">{formatPrice(displayCoin.high_24h)}</span>
             </div>
           </div>
         </div>
@@ -322,7 +323,7 @@ export function CoinDetail() {
 
         {/* AI Analysis Section */}
         <div className="mb-8">
-          <AIAnalysis coin={coin} />
+          <AIAnalysis coin={displayCoin} />
         </div>
 
         {/* Additional Info */}
@@ -351,10 +352,12 @@ export function CoinDetail() {
         </div>
 
         {/* Last Updated */}
-        {/* Last Updated */}
         <div className="flex items-center justify-center gap-2 mt-8 text-xs text-muted-foreground">
           <Clock className="w-3 h-3" />
-          <span>Last updated: {formatDate(coin.last_updated)}</span>
+          <span>Last updated: {formatDate(displayCoin.last_updated)}</span>
+          {isUsingFallback && (
+            <span className="text-yellow-400 ml-2">(Market data)</span>
+          )}
         </div>
       </div>
 
@@ -393,7 +396,7 @@ export function CoinDetail() {
                     <ArrowRightLeft className="w-4 h-4 text-stitch-green" />
                   </div>
                   <span className="text-sm font-medium text-white">
-                    {coin.name} Converter
+                    {displayCoin.name} Converter
                   </span>
                 </div>
                 <button
@@ -420,7 +423,7 @@ export function CoinDetail() {
                       className="bg-surface-container-low border-white/[0.06] focus:border-stitch-green/50 text-white text-base font-medium h-10"
                     />
                     <span className="px-2 py-1.5 rounded-lg bg-stitch-green/10 text-stitch-green text-xs font-medium whitespace-nowrap">
-                      {coin.symbol.toUpperCase()}
+                      {displayCoin.symbol.toUpperCase()}
                     </span>
                   </div>
                 </div>
@@ -503,7 +506,7 @@ export function CoinDetail() {
                 {/* Exchange rate info */}
                 <div className="pt-1 border-t border-white/[0.06]">
                   <p className="text-[10px] text-muted-foreground text-center">
-                    1 {coin.symbol.toUpperCase()} = <span className="text-white font-medium">{CURRENCIES.find(c => c.value === convertTo)?.symbol}{(coinPriceUSD * targetRate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                    1 {displayCoin.symbol.toUpperCase()} = <span className="text-white font-medium">{CURRENCIES.find(c => c.value === convertTo)?.symbol}{(coinPriceUSD * targetRate).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                   </p>
                 </div>
               </div>
