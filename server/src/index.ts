@@ -89,6 +89,110 @@ app.get('/api/coins', async (req, res) => {
   }
 });
 
+// Mock data for popular coins (fallback when API fails)
+const mockCoins: Record<string, any> = {
+  ethereum: {
+    id: 'ethereum', symbol: 'eth', name: 'Ethereum', web_slug: 'ethereum',
+    image: { large: 'https://coin-images.coingecko.com/coins/images/279/large/ethereum.png?1696501628' },
+    market_cap_rank: 2,
+    market_data: {
+      current_price: { usd: 3450 }, market_cap: { usd: 415000000000 },
+      total_volume: { usd: 15000000000 }, circulating_supply: 120000000,
+      total_supply: 120000000, max_supply: null,
+      ath: { usd: 4878 }, ath_change_percentage: { usd: -29.3 },
+      ath_date: { usd: '2021-11-10T14:24:19.604Z' },
+      atl: { usd: 0.432 }, atl_change_percentage: { usd: 798000 },
+      atl_date: { usd: '2015-10-20T00:00:00.000Z' },
+      price_change_24h: 50, price_change_percentage_24h: 1.5,
+      market_cap_change_24h: 6000000000, market_cap_change_percentage_24h: 1.5,
+      high_24h: { usd: 3500 }, low_24h: { usd: 3400 },
+      fully_diluted_valuation: { usd: 415000000000 },
+      last_updated: new Date().toISOString()
+    },
+    last_updated: new Date().toISOString()
+  },
+  bnb: {
+    id: 'bnb', symbol: 'bnb', name: 'BNB', web_slug: 'bnb',
+    image: { large: 'https://coin-images.coingecko.com/coins/images/825/large/bnb-icon2_2x.png?1696501970' },
+    market_cap_rank: 4,
+    market_data: {
+      current_price: { usd: 610 }, market_cap: { usd: 90000000000 },
+      total_volume: { usd: 1200000000 }, circulating_supply: 147000000,
+      total_supply: 147000000, max_supply: 200000000,
+      ath: { usd: 720 }, ath_change_percentage: { usd: -15.3 },
+      ath_date: { usd: '2021-05-10T07:24:17.097Z' },
+      atl: { usd: 0.0398 }, atl_change_percentage: { usd: 1532000 },
+      atl_date: { usd: '2017-10-19T00:00:00.000Z' },
+      price_change_24h: 8, price_change_percentage_24h: 1.3,
+      market_cap_change_24h: 1200000000, market_cap_change_percentage_24h: 1.3,
+      high_24h: { usd: 620 }, low_24h: { usd: 600 },
+      fully_diluted_valuation: { usd: 122000000000 },
+      last_updated: new Date().toISOString()
+    },
+    last_updated: new Date().toISOString()
+  },
+  solana: {
+    id: 'solana', symbol: 'sol', name: 'Solana', web_slug: 'solana',
+    image: { large: 'https://coin-images.coingecko.com/coins/images/4128/large/solana.png?1696505549' },
+    market_cap_rank: 5,
+    market_data: {
+      current_price: { usd: 145 }, market_cap: { usd: 68000000000 },
+      total_volume: { usd: 3500000000 }, circulating_supply: 469000000,
+      total_supply: 580000000, max_supply: null,
+      ath: { usd: 260 }, ath_change_percentage: { usd: -44.2 },
+      ath_date: { usd: '2021-11-06T21:54:35.825Z' },
+      atl: { usd: 0.5 }, atl_change_percentage: { usd: 28900 },
+      atl_date: { usd: '2020-05-11T19:35:23.449Z' },
+      price_change_24h: 3, price_change_percentage_24h: 2.1,
+      market_cap_change_24h: 1400000000, market_cap_change_percentage_24h: 2.1,
+      high_24h: { usd: 148 }, low_24h: { usd: 140 },
+      fully_diluted_valuation: { usd: 84100000000 },
+      last_updated: new Date().toISOString()
+    },
+    last_updated: new Date().toISOString()
+  },
+  ripple: {
+    id: 'ripple', symbol: 'xrp', name: 'XRP', web_slug: 'xrp',
+    image: { large: 'https://coin-images.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png?1696501419' },
+    market_cap_rank: 3,
+    market_data: {
+      current_price: { usd: 2.15 }, market_cap: { usd: 124000000000 },
+      total_volume: { usd: 5000000000 }, circulating_supply: 57500000000,
+      total_supply: 100000000000, max_supply: 100000000000,
+      ath: { usd: 3.4 }, ath_change_percentage: { usd: -36.8 },
+      ath_date: { usd: '2026-01-15T00:00:00.000Z' },
+      atl: { usd: 0.00268 }, atl_change_percentage: { usd: 80000 },
+      atl_date: { usd: '2014-05-22T00:00:00.000Z' },
+      price_change_24h: 0.05, price_change_percentage_24h: 2.4,
+      market_cap_change_24h: 3000000000, market_cap_change_percentage_24h: 2.5,
+      high_24h: { usd: 2.2 }, low_24h: { usd: 2.1 },
+      fully_diluted_valuation: { usd: 215000000000 },
+      last_updated: new Date().toISOString()
+    },
+    last_updated: new Date().toISOString()
+  },
+  dogecoin: {
+    id: 'dogecoin', symbol: 'doge', name: 'Dogecoin', web_slug: 'dogecoin',
+    image: { large: 'https://coin-images.coingecko.com/coins/images/5/large/dogecoin.png?1696501407' },
+    market_cap_rank: 9,
+    market_data: {
+      current_price: { usd: 0.22 }, market_cap: { usd: 32000000000 },
+      total_volume: { usd: 2000000000 }, circulating_supply: 145000000000,
+      total_supply: 145000000000, max_supply: null,
+      ath: { usd: 0.73 }, ath_change_percentage: { usd: -69.9 },
+      ath_date: { usd: '2021-05-08T05:08:23.458Z' },
+      atl: { usd: 0.00008547 }, atl_change_percentage: { usd: 256000 },
+      atl_date: { usd: '2015-05-06T00:00:00.000Z' },
+      price_change_24h: 0.005, price_change_percentage_24h: 2.3,
+      market_cap_change_24h: 700000000, market_cap_change_percentage_24h: 2.2,
+      high_24h: { usd: 0.225 }, low_24h: { usd: 0.215 },
+      fully_diluted_valuation: { usd: 31900000000 },
+      last_updated: new Date().toISOString()
+    },
+    last_updated: new Date().toISOString()
+  }
+};
+
 // Single coin detail
 app.get('/api/coins/:id', async (req, res) => {
   const { id } = req.params;
@@ -111,6 +215,11 @@ app.get('/api/coins/:id', async (req, res) => {
       if (lastGood[cacheKey]) {
         return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
       }
+      // Use mock data for popular coins
+      if (mockCoins[id]) {
+        console.log(`Using mock data for ${id}`);
+        return res.json({ success: true, data: mockCoins[id], source: 'mock' });
+      }
       throw new Error('CoinGecko failed');
     }
     
@@ -122,6 +231,11 @@ app.get('/api/coins/:id', async (req, res) => {
     // Return fallback data if available
     if (lastGood[cacheKey]) {
       return res.json({ success: true, data: lastGood[cacheKey], source: 'fallback' });
+    }
+    // Use mock data for popular coins
+    if (mockCoins[id]) {
+      console.log(`Using mock data for ${id}`);
+      return res.json({ success: true, data: mockCoins[id], source: 'mock' });
     }
     res.status(503).json({ success: false, error: 'Coin data unavailable', data: null });
   }
