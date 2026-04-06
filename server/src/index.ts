@@ -299,6 +299,19 @@ const warmCache = async () => {
 setTimeout(warmCache, 5000);
 setInterval(warmCache, 55 * 1000);
 
+// ── KEEP-ALIVE SELF-PING (prevents Render free tier sleep) ──
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
+setInterval(async () => {
+  try {
+    await fetch(`${SELF_URL}/health`);
+    console.log('Keep-alive ping sent to', SELF_URL);
+  } catch (err) {
+    console.warn('Keep-alive ping failed:', err);
+  }
+}, 10 * 60 * 1000); // every 10 minutes
+
 app.listen(PORT, () => {
   console.log(`Eke Market API running on port ${PORT}`);
+  console.log(`External URL: ${SELF_URL}`);
 });

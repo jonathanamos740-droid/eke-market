@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Navigation } from '@/components/Navigation';
 import { MarketOverview } from '@/pages/MarketOverview';
@@ -8,6 +9,15 @@ import { Compare } from '@/pages/Compare';
 import { GainersLosers } from '@/pages/GainersLosers';
 
 function App() {
+  // Wake up Render server immediately on app open
+  useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl) {
+      fetch(`${apiUrl}/health`, { method: 'GET', mode: 'no-cors' })
+        .catch(() => {}); // fail silently
+    }
+  }, []);
+
   return (
     <Router>
       <div className="min-h-screen bg-background">

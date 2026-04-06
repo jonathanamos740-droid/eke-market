@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { cryptoApi, handleApiError } from '@/services/cryptoApi';
+import { localCache } from '@/api/localCache';
 import type { CryptoAsset, CryptoDetail, MarketData, TrendingCoin, CryptoNews } from '@/types/crypto';
 
 export const useTopCryptos = (page = 1, perPage = 50) => {
-  const [data, setData] = useState<CryptoAsset[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `coins_${page}_${perPage}`;
+  const stale = localCache.getStale(cacheKey);
+  const [data, setData] = useState<CryptoAsset[]>(stale || []);
+  const [loading, setLoading] = useState(!stale);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -14,22 +17,32 @@ export const useTopCryptos = (page = 1, perPage = 50) => {
         setError(null);
         const cryptos = await cryptoApi.getTopCryptos(page, perPage);
         setData(cryptos);
+        localCache.set(cacheKey, cryptos);
       } catch (err) {
-        setError(handleApiError(err));
+        const errorMsg = handleApiError(err);
+        setError(errorMsg);
+        // Fallback to stale data if available
+        const fallback = localCache.getStale(cacheKey);
+        if (fallback) {
+          setData(fallback);
+          setError('Showing cached data — ' + errorMsg);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [page, perPage]);
+  }, [page, perPage, cacheKey]);
 
   return { data, loading, error };
 };
 
 export const useCoinDetail = (id: string | undefined) => {
-  const [data, setData] = useState<CryptoDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = id ? `coin_detail_${id}` : null;
+  const stale = cacheKey ? localCache.getStale(cacheKey) : null;
+  const [data, setData] = useState<CryptoDetail | null>(stale || null);
+  const [loading, setLoading] = useState(!stale && !!id);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,22 +54,31 @@ export const useCoinDetail = (id: string | undefined) => {
         setError(null);
         const coin = await cryptoApi.getCoinDetail(id);
         setData(coin);
+        if (cacheKey) localCache.set(cacheKey, coin);
       } catch (err) {
-        setError(handleApiError(err));
+        const errorMsg = handleApiError(err);
+        setError(errorMsg);
+        const fallback = cacheKey ? localCache.getStale(cacheKey) : null;
+        if (fallback) {
+          setData(fallback);
+          setError('Showing cached data — ' + errorMsg);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [id]);
+  }, [id, cacheKey]);
 
   return { data, loading, error };
 };
 
 export const useCoinHistory = (id: string | undefined, days: number | 'max' = 7) => {
-  const [data, setData] = useState<{ prices: [number, number][] } | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = id ? `coin_history_${id}_${days}` : null;
+  const stale = cacheKey ? localCache.getStale(cacheKey) : null;
+  const [data, setData] = useState<{ prices: [number, number][] } | null>(stale || null);
+  const [loading, setLoading] = useState(!stale && !!id);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -68,22 +90,31 @@ export const useCoinHistory = (id: string | undefined, days: number | 'max' = 7)
         setError(null);
         const history = await cryptoApi.getCoinHistory(id, days);
         setData(history);
+        if (cacheKey) localCache.set(cacheKey, history);
       } catch (err) {
-        setError(handleApiError(err));
+        const errorMsg = handleApiError(err);
+        setError(errorMsg);
+        const fallback = cacheKey ? localCache.getStale(cacheKey) : null;
+        if (fallback) {
+          setData(fallback);
+          setError('Showing cached data — ' + errorMsg);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [id, days]);
+  }, [id, days, cacheKey]);
 
   return { data, loading, error };
 };
 
 export const useGlobalData = () => {
-  const [data, setData] = useState<MarketData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = 'global_data';
+  const stale = localCache.getStale(cacheKey);
+  const [data, setData] = useState<MarketData | null>(stale || null);
+  const [loading, setLoading] = useState(!stale);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,8 +124,15 @@ export const useGlobalData = () => {
         setError(null);
         const global = await cryptoApi.getGlobalData();
         setData(global.data);
+        localCache.set(cacheKey, global.data);
       } catch (err) {
-        setError(handleApiError(err));
+        const errorMsg = handleApiError(err);
+        setError(errorMsg);
+        const fallback = localCache.getStale(cacheKey);
+        if (fallback) {
+          setData(fallback);
+          setError('Showing cached data — ' + errorMsg);
+        }
       } finally {
         setLoading(false);
       }
@@ -107,8 +145,10 @@ export const useGlobalData = () => {
 };
 
 export const useTrendingCoins = () => {
-  const [data, setData] = useState<TrendingCoin[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = 'trending_coins';
+  const stale = localCache.getStale(cacheKey);
+  const [data, setData] = useState<TrendingCoin[]>(stale || []);
+  const [loading, setLoading] = useState(!stale);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -118,8 +158,15 @@ export const useTrendingCoins = () => {
         setError(null);
         const trending = await cryptoApi.getTrendingCoins();
         setData(trending.coins);
+        localCache.set(cacheKey, trending.coins);
       } catch (err) {
-        setError(handleApiError(err));
+        const errorMsg = handleApiError(err);
+        setError(errorMsg);
+        const fallback = localCache.getStale(cacheKey);
+        if (fallback) {
+          setData(fallback);
+          setError('Showing cached data — ' + errorMsg);
+        }
       } finally {
         setLoading(false);
       }
@@ -132,58 +179,78 @@ export const useTrendingCoins = () => {
 };
 
 export const useGainersLosers = () => {
+  const cacheKey = 'gainers_losers';
+  const stale = localCache.getStale(cacheKey);
   const [data, setData] = useState<{ gainers: CryptoAsset[]; losers: CryptoAsset[] }>({ gainers: [], losers: [] });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!stale);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchGainersLosers = async () => {
+  const fetchGainersLosers = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const result = await cryptoApi.getGainersLosers();
       setData(result);
+      localCache.set(cacheKey, result);
     } catch (err) {
-      setError(handleApiError(err));
+      const errorMsg = handleApiError(err);
+      setError(errorMsg);
+      const fallback = localCache.getStale(cacheKey);
+      if (fallback) {
+        setData(fallback);
+        setError('Showing cached data — ' + errorMsg);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchGainersLosers();
-  }, []);
+  }, [fetchGainersLosers]);
 
   return { data, loading, error, refresh: fetchGainersLosers };
 };
 
 export const useCryptoNews = (limit = 6) => {
-  const [data, setData] = useState<CryptoNews[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `crypto_news_${limit}`;
+  const stale = localCache.getStale(cacheKey);
+  const [data, setData] = useState<CryptoNews[]>(stale || []);
+  const [loading, setLoading] = useState(!stale);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchNews = async () => {
+  const fetchNews = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const news = await cryptoApi.getCryptoNews(limit);
       setData(news);
+      localCache.set(cacheKey, news);
     } catch (err) {
-      setError(handleApiError(err));
+      const errorMsg = handleApiError(err);
+      setError(errorMsg);
+      const fallback = localCache.getStale(cacheKey);
+      if (fallback) {
+        setData(fallback);
+        setError('Showing cached data — ' + errorMsg);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, cacheKey]);
 
   useEffect(() => {
     fetchNews();
-  }, [limit]);
+  }, [fetchNews]);
 
   return { data, loading, error, refresh: fetchNews };
 };
 
 export const useExchangeRates = () => {
-  const [rates, setRates] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
+  const cacheKey = 'exchange_rates';
+  const stale = localCache.getStale(cacheKey);
+  const [rates, setRates] = useState<Record<string, number>>(stale || {});
+  const [loading, setLoading] = useState(!stale);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -193,8 +260,15 @@ export const useExchangeRates = () => {
         setError(null);
         const data = await cryptoApi.getExchangeRates();
         setRates(data);
+        localCache.set(cacheKey, data);
       } catch (err) {
-        setError(handleApiError(err));
+        const errorMsg = handleApiError(err);
+        setError(errorMsg);
+        const fallback = localCache.getStale(cacheKey);
+        if (fallback) {
+          setRates(fallback);
+          setError('Showing cached data — ' + errorMsg);
+        }
       } finally {
         setLoading(false);
       }

@@ -6,59 +6,27 @@ if (!BASE_URL) {
   console.error('VITE_API_URL is not set — API calls will fail for all users');
 }
 
-const apiFetch = async (endpoint: string) => {
-  // Try proxy first
-  if (BASE_URL) {
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const apiFetch = async (endpoint: string, retries = 3, backoff = 800): Promise<any> => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const res = await fetch(`${BASE_URL}${endpoint}`);
-      if (!res.ok) throw new Error(`Proxy error: ${res.status}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout per attempt
+
+      const res = await fetch(`${BASE_URL}${endpoint}`, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
-    } catch (err) {
-      console.warn('Proxy failed, falling back to direct API:', err);
+    } catch (err: any) {
+      const isLast = attempt === retries;
+      if (isLast) throw err;
+      console.warn(`Attempt ${attempt} failed for ${endpoint}, retrying in ${backoff * attempt}ms...`);
+      await sleep(backoff * attempt); // exponential backoff: 800ms, 1600ms, 2400ms
     }
-  }
-
-  // Fallback to direct API calls
-  try {
-    let fallbackUrl = endpoint;
-    
-    // Map proxy endpoints to direct API URLs
-    if (endpoint === '/api/coins') {
-      fallbackUrl = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=true';
-    } else if (endpoint === '/api/global') {
-      fallbackUrl = 'https://api.coingecko.com/api/v3/global';
-    } else if (endpoint === '/api/trending') {
-      fallbackUrl = 'https://api.coingecko.com/api/v3/search/trending';
-    } else if (endpoint === '/api/fear-greed') {
-      fallbackUrl = 'https://api.alternative.me/fng/?limit=1';
-    } else if (endpoint === '/api/gainers-losers') {
-      fallbackUrl = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&price_change_percentage=24h';
-    } else if (endpoint.startsWith('/api/compare')) {
-      const params = new URLSearchParams(endpoint.split('?')[1]);
-      const ids = params.get('ids');
-      fallbackUrl = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=10&page=1&sparkline=true`;
-    } else if (endpoint.startsWith('/api/coins/') && endpoint.includes('/chart')) {
-      const match = endpoint.match(/\/api\/coins\/([^/]+)\/chart\?days=(\d+)/);
-      if (match) {
-        fallbackUrl = `https://api.coingecko.com/api/v3/coins/${match[1]}/market_chart?vs_currency=usd&days=${match[2]}`;
-      }
-    } else if (endpoint.startsWith('/api/coins/') && !endpoint.includes('/chart')) {
-      const id = endpoint.replace('/api/coins/', '');
-      fallbackUrl = `https://api.coingecko.com/api/v3/coins/${id}?localization=false&tickers=false&market_data=true`;
-    } else if (endpoint.startsWith('/api/rates')) {
-      fallbackUrl = 'https://api.exchangerate-api.com/v4/latest/USD';
-    } else if (endpoint.startsWith('/api/search')) {
-      const params = new URLSearchParams(endpoint.split('?')[1]);
-      const query = params.get('query');
-      fallbackUrl = `https://api.coingecko.com/api/v3/search?query=${query}`;
-    }
-
-    const res = await fetch(fallbackUrl);
-    if (!res.ok) throw new Error(`Direct API error: ${res.status}`);
-    return await res.json();
-  } catch (fallbackErr) {
-    console.error('Direct API fallback also failed:', fallbackErr);
-    throw new Error(`All API attempts failed: ${fallbackErr instanceof Error ? fallbackErr.message : 'Unknown error'}`);
   }
 };
 
